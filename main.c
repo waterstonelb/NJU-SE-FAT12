@@ -12,8 +12,8 @@ int root_entry_num = 512 * 19;
 int data_num = 512 * 33;
 int fat_num = 512;
 unsigned char *FAT = inp + 512;
-unsigned char *Root_Entry = inp + 512*19;
-unsigned char *Data = inp + 512*33;
+unsigned char *Root_Entry = inp + 512 * 19;
+unsigned char *Data = inp + 512 * 33;
 
 typedef struct _FILE_HEADER FILE_HEADER;
 typedef struct _FILE_HEADER *PFILE_HEADER;
@@ -29,7 +29,7 @@ struct _FILE_HEADER
     DWORD DIR_FileSize;
 } __attribute__((packed)) _FILE_HEADER;
 
-void my_print(unsigned char *p, int len);
+void my_print(unsigned char *p, int len, int color);
 
 unsigned int fat_next(unsigned char *fat, unsigned int clus);
 
@@ -37,15 +37,16 @@ PFILE_HEADER find_path(unsigned char *root, char path[][11], int len);
 
 int my_cat(PFILE_HEADER entry, unsigned char *fat, unsigned char *data);
 
+int ls_l(char *path, int *res);
+
 int my_ls(PFILE_HEADER root, char para, char *path);
 
 int main()
 {
-    
+
     FILE *fat12 = fopen("a.img", "r");
     fread(inp, 1, 100000, fat12);
-
-    char path[11] = {0};
+    char path[100] = {0};
     scanf("%s", path);
     char *p = *path == '/' ? path + 1 : path;
     char pp[20][11] = {0};
@@ -57,15 +58,22 @@ int main()
         token = strtok(NULL, "/");
     }
     PFILE_HEADER entry = find_path(Root_Entry, pp, len);
-    my_ls(entry, ' ', "/");
+    my_ls(entry, 'l', path);
     //my_cat(entry, FAT, Data);
     return 0;
 }
-void my_print(unsigned char *p, int len)
+void my_print(unsigned char *p, int len, int color)
 {
     for (int i = 0; i < len; i++)
     {
-        printf("%c", *(p + i));
+        if (color == 16)
+        {
+            printf("\x1b[31m%c\x1b[0m", *(p + i));
+        }
+        else
+        {
+            printf("%c", *(p + i));
+        }
     }
 }
 unsigned int fat_next(unsigned char *fat, unsigned int clus)
@@ -122,11 +130,48 @@ PFILE_HEADER find_path(unsigned char *root, char path[][11], int len)
     return pFileHeader;
 }
 
+int ls_l(char *path, int *res)
+{
+    char p[100] = {0};
+    strcpy(p, path);
+    char pp[20][11] = {0};
+    char *token = strtok(p, "/");
+    int len = 0;
+    while (token != NULL)
+    {
+        strcpy(pp[len++], token);
+        token = strtok(NULL, "/");
+    }
+    PFILE_HEADER entry = find_path(Root_Entry, pp, len);
+    if (entry->DIR_Attr != 16)
+    {
+        res[0] = 2; //2表示文件
+        res[1] = (int)entry->DIR_FileSize;
+    }
+    else
+    {
+        res[0] = 1;
+        while (*(BYTE *)entry && *(BYTE *)entry != 0xe5)
+        {
+            if (entry->DIR_Attr == 16&&*(char*)entry!='.')
+            {
+                res[1]++;
+            }
+            else if(entry->DIR_Attr==32)
+            {
+                res[2]++;
+            }
+            ++entry;
+        }
+    }
+    return 0;
+}
+
 int my_cat(PFILE_HEADER entry, unsigned char *fat, unsigned char *data)
 {
     if (entry == NULL || entry->DIR_Attr != 10)
     {
-        my_print("Path is a directory or no such file\n", 36);
+        my_print("Path is a directory or no such file\n", 36, 0);
         return 0;
     }
     int clus_nodes[100] = {0};
@@ -149,7 +194,7 @@ int my_cat(PFILE_HEADER entry, unsigned char *fat, unsigned char *data)
         for (unsigned int j = 0; j < size && j < 512; j++)
         {
             char *c = data + j + (clus_nodes[i] - 2) * 512;
-            my_print(c, 1);
+            my_print(c, 1, 0);
         }
         size -= 512;
     }
@@ -159,25 +204,34 @@ int my_ls(PFILE_HEADER root, char para, char *path)
     PFILE_HEADER entry = root;
     if (entry == NULL || *(BYTE *)entry == 0xe5)
     {
-        my_print("Path is a directory or no such file\n", 36);
+        my_print("Path is a directory or no such file\n", 36, 0);
         return 0;
     }
     char out[20][11] = {0};
     char p[20] = {0};
     strcpy(p, path);
-    my_print(p, strlen(p));
-    my_print(":\n", 2);
-    int dir_num = 0, file_num = 0, n = 0;
+    if (strlen(p) > 1)
+        strcat(p, "/");
+    my_print(p, strlen(p), 0);
+    if (para == 'l')
+    {
+        int res[3] = {0};
+        ls_l(path, res);
+        char p1[10] = {0}, p2[10] = {0};
+        sprintf(p1, "%d", res[1]);
+        sprintf(p2, "%d", res[2]);
+        my_print(" ", 1, 0);
+        my_print(p1, strlen(p1), 0);
+        if (res[0] == 1)
+        {
+            my_print(" ", 1, 0);
+            my_print(p2, strlen(p2), 0);
+        }
+    }
+    my_print(":\n", 2, 0);
+    int n = 0;
     while (*(BYTE *)entry && *(BYTE *)entry != 0xe5)
     {
-        if (entry->DIR_Attr == 16)
-        {
-            dir_num++;
-        }
-        else
-        {
-            file_num++;
-        }
         char name[12] = {0};
         memcpy(name, entry->DIR_Name, 11);
         for (int i = 0; i < 12; i++)
@@ -191,21 +245,42 @@ int my_ls(PFILE_HEADER root, char para, char *path)
         }
         if (entry->DIR_Attr == 16 && entry->DIR_Name[0] != 46)
             strcpy(out[n++], name);
-        strcat(name, " ");
-        my_print(name, strlen(name));
+        my_print(name, strlen(name), (int)entry->DIR_Attr);
+        if (para == 'l')
+        {
+            if (*(char *)entry != '.')
+            {
+                char tpath[100] = {0};
+                int res[3] = {0};
+                char p1[10] = {0}, p2[10] = {0};
+                strcpy(tpath, path);
+                strcat(tpath,"/");
+                strcat(tpath, name);
+                ls_l(tpath, res);
+                sprintf(p1, "%d", res[1]);
+                sprintf(p2, "%d", res[2]);
+                my_print(" ", 1, 0);
+                my_print(p1, strlen(p1), 0);
+                if (res[0] == 1)
+                {
+                    my_print(" ", 1, 0);
+                    my_print(p2, strlen(p2), 0);
+                }
+            }
+            my_print("\n", 1, 0);
+        }
 
         ++entry;
     }
-    my_print("\n", 1);
+    my_print("\n", 1, 0);
     for (int i = 0; i < n; i++)
     {
-        char nnn[1][11]={0};
+        char nnn[1][11] = {0};
         char ppp[100] = {0};
         strcpy(nnn[0], out[i]);
-        strcpy(ppp, path);
+        strcpy(ppp, p);
         strcat(ppp, out[i]);
-        strcat(ppp, "/");
         PFILE_HEADER next = find_path((unsigned char *)root, nnn, 1);
-        my_ls(next, ' ', ppp);
+        my_ls(next, para, ppp);
     }
 }
