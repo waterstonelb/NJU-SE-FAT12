@@ -31,6 +31,8 @@ struct _FILE_HEADER
 
 int input(char *inp, char *path, char *command, char *para);
 
+void asm_print(const char*, int);
+
 void my_print(unsigned char *p, int len, int color);
 
 unsigned int fat_next(unsigned char *fat, unsigned int clus);
@@ -46,14 +48,20 @@ int my_ls(PFILE_HEADER root, char para, char *path);
 int main()
 {
 
-    FILE *fat12 = fopen("a.img", "r");
+    FILE *fat12 = fopen("ref.img", "r");
     fread(FAT_STORE, 1, 100000, fat12);
     while (1)
     {
-        my_print(">",1,0);
+        my_print("> ",2,0);
         char inp[100] = {0}, t;
         int len = 100;
         fgets(inp,len,stdin);
+
+        if(strlen(inp) == 0 || !strcmp(inp, "exit\n")){
+            my_print("exit\n", 5, 0);
+            return 0;
+        }
+
         inp[strlen(inp)-1]=0;
         char path[100] = {0}, command[10] = {0}, para = 0;
         //scanf("%s", path);
@@ -67,10 +75,6 @@ int main()
         {
             my_print("Paramter error!\n", 16, 0);
             continue;
-        }
-        if (strcmp(command, "exit") == 0)
-        {
-            return 0;
         }
         //printf("%d %s %s %c\n", RES_INPUT, command, path, para);
         char pp[20][11] = {0};
@@ -90,8 +94,6 @@ int main()
         }else{
             my_print("Invalid input!\n",14,0);
         }
-        // //my_ls(entry, 0, path);
-        //
     }
 
     return 0;
@@ -133,20 +135,23 @@ int input(char *inp, char *path, char *command, char *para)
         count++;
         token = strtok(NULL, " ");
     }
-    return count > 3 || count == 0;
+    return count == 0;
 }
 
 void my_print(unsigned char *p, int len, int color)
 {
+    char buf[100];
     for (int i = 0; i < len; i++)
     {
         if (color == 16)
         {
-            printf("\x1b[31m%c\x1b[0m", *(p + i));
+            sprintf(buf, "\x1b[31m%c\x1b[0m", *(p + i));
+            asm_print(buf, strlen(buf));
         }
         else
         {
-            printf("%c", *(p + i));
+            sprintf(buf, "%c", *(p + i));
+            asm_print(buf, strlen(buf));
         }
     }
 }
@@ -243,7 +248,7 @@ int ls_l(char *path, int *res)
 
 int my_cat(PFILE_HEADER entry, unsigned char *fat, unsigned char *data)
 {
-    if (entry == NULL || entry->DIR_Attr != 32)
+    if (entry == NULL || entry->DIR_Attr != 0)
     {
         my_print("Path is a directory or no such file\n", 36, 0);
         return 0;
