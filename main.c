@@ -7,13 +7,13 @@
 #define WORD unsigned short
 #define DWORD unsigned int
 
-unsigned char inp[100000] = {0};
+unsigned char FAT_STORE[100000] = {0};
 int root_entry_num = 512 * 19;
 int data_num = 512 * 33;
 int fat_num = 512;
-unsigned char *FAT = inp + 512;
-unsigned char *Root_Entry = inp + 512 * 19;
-unsigned char *Data = inp + 512 * 33;
+unsigned char *FAT = FAT_STORE + 512;
+unsigned char *Root_Entry = FAT_STORE + 512 * 19;
+unsigned char *Data = FAT_STORE + 512 * 33;
 
 typedef struct _FILE_HEADER FILE_HEADER;
 typedef struct _FILE_HEADER *PFILE_HEADER;
@@ -28,6 +28,8 @@ struct _FILE_HEADER
     WORD DIR_FstClus;
     DWORD DIR_FileSize;
 } __attribute__((packed)) _FILE_HEADER;
+
+int input(char *inp, char *path, char *command, char *para);
 
 void my_print(unsigned char *p, int len, int color);
 
@@ -45,23 +47,95 @@ int main()
 {
 
     FILE *fat12 = fopen("a.img", "r");
-    fread(inp, 1, 100000, fat12);
-    char path[100] = {0};
-    scanf("%s", path);
-    char *p = *path == '/' ? path + 1 : path;
-    char pp[20][11] = {0};
-    char *token = strtok(p, "/");
-    int len = 0;
-    while (token != NULL)
+    fread(FAT_STORE, 1, 100000, fat12);
+    while (1)
     {
-        strcpy(pp[len++], token);
-        token = strtok(NULL, "/");
+        my_print(">",1,0);
+        char inp[100] = {0}, t;
+        int len = 100;
+        fgets(inp,len,stdin);
+        inp[strlen(inp)-1]=0;
+        char path[100] = {0}, command[10] = {0}, para = 0;
+        //scanf("%s", path);
+        int RES_INPUT = input(inp, path, command, &para);
+        if (RES_INPUT == 1)
+        {
+            my_print("Invalid Input!\n", 15, 0);
+            continue;
+        }
+        else if (RES_INPUT == 2)
+        {
+            my_print("Paramter error!\n", 16, 0);
+            continue;
+        }
+        if (strcmp(command, "exit") == 0)
+        {
+            return 0;
+        }
+        //printf("%d %s %s %c\n", RES_INPUT, command, path, para);
+        char pp[20][11] = {0};
+        char *token = strtok(path, "/");
+        len = 0;
+        while (token != NULL)
+        {
+            strcpy(pp[len++], token);
+            token = strtok(NULL, "/");
+        }
+        PFILE_HEADER entry = find_path(Root_Entry, pp, len);
+        char *p = *path == '/' ? path + 1 : path;
+        if(strcmp(command,"cat")==0){
+            my_cat(entry, FAT, Data);
+        }else if(strcmp(command,"ls")==0){
+            my_ls(entry, para, path);
+        }else{
+            my_print("Invalid input!\n",14,0);
+        }
+        // //my_ls(entry, 0, path);
+        //
     }
-    PFILE_HEADER entry = find_path(Root_Entry, pp, len);
-    my_ls(entry, 'l', path);
-    //my_cat(entry, FAT, Data);
+
     return 0;
 }
+
+int input(char *inp, char *path, char *command, char *para)
+{
+    char *token = strtok(inp, " ");
+    int count = 0;
+    while (token)
+    {
+        if (count == 0)
+        {
+            if (strcmp(token, "ls") == 0 || strcmp(token, "cat") == 0)
+                strcpy(command, token);
+            else
+            {
+                return 1;
+            }
+        }
+        else if (*token == '-' && count != 0)
+        {
+            int i = 1;
+            for (; *(token + i) == 'l'; i++)
+                ;
+            if (i == 1 || *(token + i) != 0 || strcmp(command, "ls") != 0)
+            {
+                return 2;
+            }
+            else
+            {
+                *para = *(token + 1);
+            }
+        }
+        else
+        {
+            strcpy(path, token);
+        }
+        count++;
+        token = strtok(NULL, " ");
+    }
+    return count > 3 || count == 0;
+}
+
 void my_print(unsigned char *p, int len, int color)
 {
     for (int i = 0; i < len; i++)
@@ -153,11 +227,11 @@ int ls_l(char *path, int *res)
         res[0] = 1;
         while (*(BYTE *)entry && *(BYTE *)entry != 0xe5)
         {
-            if (entry->DIR_Attr == 16&&*(char*)entry!='.')
+            if (entry->DIR_Attr == 16 && *(char *)entry != '.')
             {
                 res[1]++;
             }
-            else if(entry->DIR_Attr==32)
+            else if (entry->DIR_Attr == 32)
             {
                 res[2]++;
             }
@@ -169,7 +243,7 @@ int ls_l(char *path, int *res)
 
 int my_cat(PFILE_HEADER entry, unsigned char *fat, unsigned char *data)
 {
-    if (entry == NULL || entry->DIR_Attr != 10)
+    if (entry == NULL || entry->DIR_Attr != 32)
     {
         my_print("Path is a directory or no such file\n", 36, 0);
         return 0;
@@ -202,7 +276,7 @@ int my_cat(PFILE_HEADER entry, unsigned char *fat, unsigned char *data)
 int my_ls(PFILE_HEADER root, char para, char *path)
 {
     PFILE_HEADER entry = root;
-    if (entry == NULL || *(BYTE *)entry == 0xe5)
+    if (entry == NULL)
     {
         my_print("Path is a directory or no such file\n", 36, 0);
         return 0;
@@ -210,8 +284,8 @@ int my_ls(PFILE_HEADER root, char para, char *path)
     char out[20][11] = {0};
     char p[20] = {0};
     strcpy(p, path);
-    if (strlen(p) > 1)
-        strcat(p, "/");
+    //if (strlen(p) > 1)
+    strcat(p, "/");
     my_print(p, strlen(p), 0);
     if (para == 'l')
     {
@@ -246,6 +320,7 @@ int my_ls(PFILE_HEADER root, char para, char *path)
         if (entry->DIR_Attr == 16 && entry->DIR_Name[0] != 46)
             strcpy(out[n++], name);
         my_print(name, strlen(name), (int)entry->DIR_Attr);
+        my_print(" ",1,0);
         if (para == 'l')
         {
             if (*(char *)entry != '.')
@@ -254,7 +329,7 @@ int my_ls(PFILE_HEADER root, char para, char *path)
                 int res[3] = {0};
                 char p1[10] = {0}, p2[10] = {0};
                 strcpy(tpath, path);
-                strcat(tpath,"/");
+                strcat(tpath, "/");
                 strcat(tpath, name);
                 ls_l(tpath, res);
                 sprintf(p1, "%d", res[1]);
