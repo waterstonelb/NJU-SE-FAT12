@@ -100,7 +100,7 @@ int main()
 int input(char *inp, char *path, char *command, char *para)
 {
     char *token = strtok(inp, " ");
-    int count = 0;
+    int count = 0,hot=0;
     while (token)
     {
         if (count == 0)
@@ -119,12 +119,12 @@ int input(char *inp, char *path, char *command, char *para)
             else
                 *para = *(token + 1);
         }
-        else
-            strcpy(path, token);
+        else{
+            strcpy(path, token);hot++;}
         count++;
         token = strtok(NULL, " ");
     }
-    return count == 0;
+    return count == 0||hot!=1;
 }
 
 void my_print(unsigned char *p, int len, int color)
