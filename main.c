@@ -249,7 +249,7 @@ int my_cat(PFILE_HEADER entry, unsigned char *fat, unsigned char *data)
 int my_ls(PFILE_HEADER root, char para, char *path)
 {
     PFILE_HEADER entry = root;
-    if (entry == NULL||entry->DIR_Attr==0)
+    if (entry == NULL||entry->DIR_Attr!=16)
     {
         my_print("Path is not a directory or no such file\n", 40, 0);
         return 0;
