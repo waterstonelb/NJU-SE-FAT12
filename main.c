@@ -208,7 +208,7 @@ int ls_l(char *path, int *res)
         {
             if (entry->DIR_Attr == 16 && *(char *)entry != '.')
                 res[1]++;
-            else if (entry->DIR_Attr == 32)
+            else if (entry->DIR_Attr == 0)
                 res[2]++;
             ++entry;
         }
