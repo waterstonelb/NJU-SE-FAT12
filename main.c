@@ -124,7 +124,7 @@ int input(char *inp, char *path, char *command, char *para)
         count++;
         token = strtok(NULL, " ");
     }
-    return count == 0||hot!=1;
+    return count == 0||hot>1;
 }
 
 void my_print(unsigned char *p, int len, int color)
