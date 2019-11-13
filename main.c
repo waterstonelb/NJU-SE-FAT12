@@ -7,7 +7,7 @@
 #define WORD unsigned short
 #define DWORD unsigned int
 
-unsigned char FAT_STORE[100000] = {0};
+unsigned char FAT_STORE[100000] = {0};//1474560
 int root_entry_num = 512 * 19;
 int data_num = 512 * 33;
 int fat_num = 512;
@@ -15,10 +15,10 @@ unsigned char *FAT = FAT_STORE + 512;
 unsigned char *Root_Entry = FAT_STORE + 512 * 19;
 unsigned char *Data = FAT_STORE + 512 * 33;
 
-typedef struct _FILE_HEADER FILE_HEADER;
-typedef struct _FILE_HEADER *PFILE_HEADER;
+//typedef struct _FILE_HEADER FILE_HEADER;
+typedef struct FILE_HEADER *PFILE_HEADER;
 
-struct _FILE_HEADER
+struct FILE_HEADER
 {
     BYTE DIR_Name[11];
     BYTE DIR_Attr;
@@ -27,7 +27,8 @@ struct _FILE_HEADER
     WORD DIR_WrtDate;
     WORD DIR_FstClus;
     DWORD DIR_FileSize;
-} __attribute__((packed)) _FILE_HEADER;
+} __attribute__((packed)) FILE_HEADER;
+
 
 int input(char *inp, char *path, char *command, char *para);
 
@@ -48,8 +49,8 @@ int my_ls(PFILE_HEADER root, char para, char *path);
 int main()
 {
 
-    FILE *fat12 = fopen("ref.img", "r");
-    fread(FAT_STORE, 1, 100000, fat12);
+    FILE *fat12 = fopen("a.img", "r");
+    fread(FAT_STORE, 1, 100000, fat12);//1474560
     while (1)
     {
         my_print("> ",2,0);
@@ -65,6 +66,7 @@ int main()
         char path[100] = {0}, command[10] = {0}, para = 0;
 
         int RES_INPUT = input(inp, path, command, &para);
+
         if (RES_INPUT == 1)
         {
             my_print("Invalid Input!\n", 15, 0);
@@ -73,6 +75,10 @@ int main()
         else if (RES_INPUT == 2)
         {
             my_print("Paramter error!\n", 16, 0);
+            continue;
+        }
+        if(strcmp(command,"cat")==0&&path[strlen(path)-1]=='/'){
+            my_print("Is a directory\n", 16, 0);
             continue;
         }
         char pp[20][11] = {0};
@@ -290,7 +296,7 @@ int my_ls(PFILE_HEADER root, char para, char *path)
         if (entry->DIR_Attr == 16 && entry->DIR_Name[0] != 46)
             strcpy(out[n++], name);
         my_print(name, strlen(name), (int)entry->DIR_Attr);
-        my_print(" ",1,0);
+        my_print("  ",2,0);
         if (para == 'l')
         {
             if (*(char *)entry != '.')
@@ -304,11 +310,11 @@ int my_ls(PFILE_HEADER root, char para, char *path)
                 ls_l(tpath, res);
                 sprintf(p1, "%d", res[1]);
                 sprintf(p2, "%d", res[2]);
-                my_print(" ", 1, 0);
+                //my_print(" ", 0, 0);
                 my_print(p1, strlen(p1), 0);
                 if (res[0] == 1)
                 {
-                    my_print(" ", 1, 0);
+                    //my_print(" ", 0, 0);
                     my_print(p2, strlen(p2), 0);
                 }
             }
